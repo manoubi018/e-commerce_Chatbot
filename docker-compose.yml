@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: projet-ecommerce-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      APP_MODULE: app.main2:app
+      PORT: 8000
+    restart: unless-stopped

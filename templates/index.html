@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Analyse de Produit - FastAPI & Gemini</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f4f7f6;
+        color: #333;
+      }
+      .container {
+        background: white;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+      }
+      h2 {
+        margin-top: 0;
+        color: #1e293b;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 10px;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #475569;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        box-sizing: border-box;
+        font-size: 15px;
+        background-color: #f8fafc;
+      }
+      textarea {
+        height: 120px;
+        resize: vertical;
+      }
+      input[readonly],
+      textarea[readonly] {
+        background-color: #f1f5f9;
+        color: #334155;
+        cursor: not-allowed;
+      }
+      button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 600;
+        transition: background 0.2s;
+        width: 100%;
+      }
+      button:hover {
+        background: #1d4ed8;
+      }
+      #preview {
+        max-width: 100%;
+        max-height: 250px;
+        margin-top: 15px;
+        display: none;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+      }
+      .hidden-box {
+        display: none;
+      }
+      .show-json-btn {
+        background: #64748b;
+        font-size: 13px;
+        padding: 8px 16px;
+        margin-top: 10px;
+        width: auto;
+      }
+      .show-json-btn:hover {
+        background: #475569;
+      }
+      #json_details {
+        height: 180px;
+        font-family: "Courier New", Courier, monospace;
+        background: #0f172a;
+        color: #38bdf8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>📷 Analyse de Produit - Intelligence Artificielle</h2>
+
+      <!-- Emplacement 1 : Sélectionner / Prendre une photo -->
+      <div class="form-group">
+        <label>Étape 1 : Charger la photo du produit</label>
+        <input
+          type="file"
+          id="fileInput"
+          accept="image/*"
+          onchange="previewImage(event)"
+        />
+        <img id="preview" alt="Aperçu du produit envoyé" />
+      </div>
+
+      <button onclick="sendData()">
+        Étape 2 : Lancer l'analyse avec Gemini
+      </button>
+
+      <hr style="margin: 30px 0; border: 0; border-top: 1px solid #e2e8f0" />
+
+      <!-- Emplacements pour les résultats de l'IA -->
+      <div class="form-group">
+        <label>Nom du Produit :</label>
+        <input
+          type="text"
+          id="nom_produit"
+          readonly
+          placeholder="En attente du lancement de l'analyse..."
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Catégorie :</label>
+        <input
+          type="text"
+          id="categorie"
+          readonly
+          placeholder="En attente du lancement de l'analyse..."
+        />
+      </div>
+
+      <div class="form-group">
+        <label>Description Marketing :</label>
+        <textarea
+          id="description_marketing"
+          readonly
+          placeholder="En attente du lancement de l'analyse..."
+        ></textarea>
+      </div>
+
+      <!-- Case invisible / masquée pour le JSON détaillé -->
+      <div class="form-group">
+        <button class="show-json-btn" onclick="toggleJson()">
+          👁️ Afficher / Masquer la description détaillée (JSON)
+        </button>
+        <div id="jsonWrapper" class="hidden-box" style="margin-top: 15px">
+          <label>Métadonnées de performance et données brutes (JSON) :</label>
+          <textarea id="json_details" readonly></textarea>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      async function sendData() {
+        const fileInput = document.getElementById("fileInput");
+
+        if (fileInput.files.length === 0) {
+          alert("Veuillez sélectionner une image avant de lancer l'analyse.");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        document.getElementById("nom_produit").value = "Analyse IA en cours...";
+        document.getElementById("categorie").value = "Analyse IA en cours...";
+        document.getElementById("description_marketing").value =
+          "Analyse IA en cours...";
+
+        try {
+          const response = await fetch("/analyze", {
+            method: "POST",
+            body: formData,
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            const visible = data.visible || {};
+
+            document.getElementById("nom_produit").value =
+              visible.nom_produit ?? "Non détecté";
+
+            document.getElementById("categorie").value =
+              visible.categorie ?? "Non détecté";
+
+            document.getElementById("description_marketing").value =
+              visible.description_marketing ?? "Non générée";
+
+            // 🔥 IMPORTANT: on affiche le VRAI JSON interne
+            const internal = data.internal || {};
+
+            document.getElementById("json_details").value = JSON.stringify(
+              internal,
+              null,
+              2,
+            );
+          } else {
+            alert("Erreur serveur ou Gemini.");
+          }
+        } catch (error) {
+          alert("Impossible de joindre le serveur FastAPI.");
+        }
+      }
+
+      // toggle plus propre
+      function toggleJson() {
+        const wrapper = document.getElementById("jsonWrapper");
+
+        if (wrapper.style.display === "block") {
+          wrapper.style.display = "none";
+        } else {
+          wrapper.style.display = "block";
+        }
+      }
+    </script>
+  </body>
+</html>
