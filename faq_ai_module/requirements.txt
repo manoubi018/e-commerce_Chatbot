@@ -1,0 +1,10 @@
+flask
+python-dotenv
+
+langgraph
+langchain
+langchain-openai
+
+supabase
+
+openai
