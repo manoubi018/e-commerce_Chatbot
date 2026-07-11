@@ -564,7 +564,7 @@
     return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   }
 
-  function renderMessage(text, role, time) {
+  function renderMessage(text, role, time, products) {
     hideEmptyState();
 
     const row = document.createElement('div');
@@ -580,10 +580,124 @@
     const inner = document.createElement('div');
     inner.className = 'msg-inner';
 
-    const bubble = document.createElement('div');
-    bubble.className = 'msg';
-    bubble.textContent = text;
-    inner.appendChild(bubble);
+    // Affiche les tuiles produits si on a des données produits ET que le message
+    // est un listing de produits (catalogue complet ou suggestion par idée)
+    const isProductListing = text.includes('Produits proposés par')
+      || text.includes('correspondent à votre idée');
+    const showProducts = products && products.length > 0 && isProductListing;
+
+    if (showProducts) {
+      // Titre = première ligne du message (avant la grille)
+      const titleBubble = document.createElement('div');
+      titleBubble.className = 'msg';
+      titleBubble.textContent = text.split('\n')[0];
+      inner.appendChild(titleBubble);
+
+      // Grille de tuiles
+      const grid = document.createElement('div');
+      grid.style.marginTop = '12px';
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
+      grid.style.gap = '12px';
+      grid.style.width = '100%';
+
+      products.forEach((p, idx) => {
+        const card = document.createElement('div');
+        card.style.background = 'rgba(255,255,255,0.04)';
+        card.style.borderRadius = '14px';
+        card.style.border = '1px solid rgba(255,255,255,0.1)';
+        card.style.overflow = 'hidden';
+        card.style.cursor = 'pointer';
+        card.style.transition = 'all 0.2s ease';
+        card.onmouseenter = () => {
+          card.style.borderColor = 'rgba(139,92,246,0.6)';
+          card.style.transform = 'translateY(-3px)';
+        };
+        card.onmouseleave = () => {
+          card.style.borderColor = 'rgba(255,255,255,0.1)';
+          card.style.transform = 'translateY(0)';
+        };
+
+        // Zone image
+        const imgBox = document.createElement('div');
+        imgBox.style.width = '100%';
+        imgBox.style.height = '130px';
+        imgBox.style.background = 'linear-gradient(135deg, rgba(139,92,246,0.25), rgba(34,211,238,0.15))';
+        imgBox.style.display = 'flex';
+        imgBox.style.alignItems = 'center';
+        imgBox.style.justifyContent = 'center';
+        imgBox.style.fontSize = '32px';
+
+        if (p.image && p.image.trim()) {
+          const img = document.createElement('img');
+          img.src = p.image;
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          // Si l'image ne charge pas, affiche une icône
+          img.onerror = () => {
+            imgBox.removeChild(img);
+            imgBox.textContent = '🛍️';
+          };
+          imgBox.appendChild(img);
+        } else {
+          imgBox.textContent = '🛍️';
+        }
+        card.appendChild(imgBox);
+
+        // Infos
+        const info = document.createElement('div');
+        info.style.padding = '10px 12px';
+
+        const name = document.createElement('div');
+        name.style.fontWeight = '600';
+        name.style.fontSize = '12.5px';
+        name.style.color = 'var(--text)';
+        name.style.marginBottom = '6px';
+        name.style.lineHeight = '1.35';
+        name.textContent = `${idx + 1}. ${p.nom}`;
+        info.appendChild(name);
+
+        const price = document.createElement('div');
+        price.style.fontSize = '13px';
+        price.style.fontWeight = '700';
+        price.style.color = 'var(--accent-3)';
+        price.textContent = `${p.prix} TND`;
+        info.appendChild(price);
+
+        // nom de l'entreprise (utile quand les produits viennent de plusieurs sociétés)
+        if (p.business) {
+          const biz = document.createElement('div');
+          biz.style.fontSize = '11px';
+          biz.style.color = 'var(--text-faint)';
+          biz.style.marginTop = '4px';
+          biz.textContent = `🏢 ${p.business}`;
+          info.appendChild(biz);
+        }
+
+        card.appendChild(info);
+        grid.appendChild(card);
+      });
+
+      inner.appendChild(grid);
+
+      // Question finale (tout ce qui suit la grille)
+      const questionMatch = text.match(/Voulez-vous[\s\S]*$/);
+      if (questionMatch) {
+        const qBubble = document.createElement('div');
+        qBubble.className = 'msg';
+        qBubble.style.marginTop = '12px';
+        qBubble.textContent = questionMatch[0].trim();
+        inner.appendChild(qBubble);
+      }
+
+    } else {
+      // Message texte normal
+      const bubble = document.createElement('div');
+      bubble.className = 'msg';
+      bubble.textContent = text;
+      inner.appendChild(bubble);
+    }
 
     if (role !== 'error') {
       const timeEl = document.createElement('div');
@@ -598,10 +712,10 @@
     return row;
   }
 
-  function addMessage(text, role) {
+  function addMessage(text, role, products) {
     const time = formatTime();
-    const row = renderMessage(text, role, time);
-    history.push({ text, role, time });
+    const row = renderMessage(text, role, time, products);
+    history.push({ text, role, time, products });
     localStorage.setItem('chatbot_history', JSON.stringify(history));
     return row;
   }
@@ -615,7 +729,7 @@
   }
 
   // rejoue les messages sauvegardés au chargement de la page
-  history.forEach(m => renderMessage(m.text, m.role, m.time));
+  history.forEach(m => renderMessage(m.text, m.role, m.time, m.products));
 
   function showTyping() {
     hideEmptyState();
@@ -713,7 +827,9 @@
 
       sessionId = data.session_id;
       localStorage.setItem('chatbot_session_id', sessionId);
-      addMessage(data.response, 'bot');
+      console.log('Réponse du serveur:', data);
+      console.log('Produits reçus:', data.products);
+      addMessage(data.response, 'bot', data.products || null);
 
     } catch (err) {
       hideTyping();

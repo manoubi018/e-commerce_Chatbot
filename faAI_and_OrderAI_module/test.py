@@ -7,7 +7,7 @@ import secrets
 import hashlib
 from datetime import datetime, timezone, timedelta
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 
 
 # =========================
@@ -16,7 +16,7 @@ app = Flask(__name__)
 
 def get_session(session_id):
     result = supabase.table("sessions") \
-        .select("company_id, company_name, order_id, user_id, pending_orders, pending_question, pending_companies, pending_removal, pending_new_order, awaiting_order_action, pending_cancel") \
+        .select("company_id, company_name, order_id, user_id, pending_orders, pending_question, pending_companies, pending_removal, pending_new_order, awaiting_order_action, pending_cancel, pending_products") \
         .eq("session_id", session_id) \
         .limit(1) \
         .execute()
@@ -26,7 +26,7 @@ def get_session(session_id):
 def save_session(session_id, company_id, company_name, order_id, user_id,
                   pending_orders=None, pending_question=None, pending_companies=None,
                   pending_removal=None, pending_new_order=None, awaiting_order_action=None,
-                  pending_cancel=None):
+                  pending_cancel=None, pending_products=None):
     now = datetime.now(timezone.utc).isoformat()
     payload = {
         "company_id": company_id,
@@ -40,6 +40,7 @@ def save_session(session_id, company_id, company_name, order_id, user_id,
         "pending_new_order": pending_new_order,
         "awaiting_order_action": awaiting_order_action,
         "pending_cancel": pending_cancel,
+        "pending_products": pending_products,
         "updated_at": now
     }
 
@@ -161,7 +162,8 @@ def chat():
                 "pending_removal": session.get("pending_removal"),
                 "pending_new_order": session.get("pending_new_order"),
                 "awaiting_order_action": session.get("awaiting_order_action"),
-                "pending_cancel": session.get("pending_cancel")
+                "pending_cancel": session.get("pending_cancel"),
+                "pending_products": session.get("pending_products")
             })
 
             save_session(
@@ -178,15 +180,19 @@ def chat():
                 pending_removal=result.get("pending_removal"),
                 pending_new_order=result.get("pending_new_order"),
                 awaiting_order_action=result.get("awaiting_order_action"),
-                pending_cancel=result.get("pending_cancel")
+                pending_cancel=result.get("pending_cancel"),
+                pending_products=result.get("pending_products")
             )
 
-            return jsonify({
+            response_data = {
                 "response": result["response"],
                 "company": result.get("company_name"),
                 "cost": result["cost"],
                 "session_id": session_id
-            })
+            }
+            if result.get("pending_products"):
+                response_data["products"] = result["pending_products"]
+            return jsonify(response_data)
 
         result = graph.invoke({
             "question": question,
@@ -203,7 +209,8 @@ def chat():
             "pending_removal": session.get("pending_removal"),
             "pending_new_order": session.get("pending_new_order"),
             "awaiting_order_action": session.get("awaiting_order_action"),
-            "pending_cancel": session.get("pending_cancel")
+            "pending_cancel": session.get("pending_cancel"),
+            "pending_products": session.get("pending_products")
         })
 
         save_session(
@@ -218,15 +225,19 @@ def chat():
             pending_removal=result.get("pending_removal"),
             pending_new_order=result.get("pending_new_order"),
             awaiting_order_action=result.get("awaiting_order_action"),
-            pending_cancel=result.get("pending_cancel")
+            pending_cancel=result.get("pending_cancel"),
+            pending_products=result.get("pending_products")
         )
 
-        return jsonify({
+        response_data = {
             "response": result["response"],
             "company": result.get("company_name"),
             "cost": result["cost"],
             "session_id": session_id
-        })
+        }
+        if result.get("pending_products"):
+            response_data["products"] = result["pending_products"]
+        return jsonify(response_data)
 
     except Exception as e:
 
@@ -280,9 +291,10 @@ def test_order():
 
 
 if __name__ == "__main__":
-
+    import os
+    port = int(os.environ.get("PORT", 5000))
     app.run(
         host="0.0.0.0",
-        port=5000,
+        port=port,
         debug=True
     )
