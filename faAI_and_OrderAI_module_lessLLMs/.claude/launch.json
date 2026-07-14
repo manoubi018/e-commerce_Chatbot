@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flask-chatbot",
+      "runtimeExecutable": ".venv/Scripts/python",
+      "runtimeArgs": ["test.py"],
+      "port": 5000,
+      "autoPort": true
+    }
+  ]
+}
